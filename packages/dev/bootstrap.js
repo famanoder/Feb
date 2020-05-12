@@ -1,44 +1,56 @@
-import { createApp } from '@eryue/core';
+import Eryue, { BadRequestException } from '@eryue/core';
 import config from '@config';
 import { log } from '@megvii-scripts/utils';
 
-const app = createApp(config);
+const app = new Eryue(config);
 
 // modules controler, modle, module
+class Logger {
+  constructor(app) {
+    this.app = app;
+  }
+  info() {
+    console.log('info', this.app.env);
+  }
+  getName() {
+    return 'logger' + this.app.env;
+  }
+}
+function infoList(cx) {
+  // this.$logger.info('1');
+  // this.$jwt.sign('data');
+  cx.service.logger.info();
+  console.log(cx.model.User.list());
+  
+  if (cx.query.q) {
+    return cx.$logger.getName() + ' ' + cx.$User.list();
+  }
+  return new BadRequestException();
+}
 
-// controler: class User extends Controler {
-//   constructor() {
-//     super();
-//   }
-//   list() {
-//     this.$logger.info('1');
-//     this.$jwt.sign('data');
-//     this.ctx.body = 'res';
-//   }
-// }
+app
+.get({
+  '/info/list': infoList,
+  '/l': cx => cx.path
+});
 
-// module: class UserModule extends Module {
-//   constructor() {
-//     super();
-//     this.prefix = 'api/user' || 'user';
-//   }
-//   [GET]: {
-//     'info/list': this.$user.list
-//   }
-//   [POST]: {
-
-//   }
-// };
- 
 // app.service.jwt.sign/verify => $jwt
 // app.service.logger => $logger
 // app context => request
-
 // app.use(middleware);
-// app.module(UserModule);
-// app.service({
-//   logger: new Log4j()
-// })
+app.service({
+  logger: Logger
+});
+app.model({
+  user: {
+    list() {
+      return 'list';
+    }
+  }
+});
+// app.helper({
+  // x
+// });
 
 app
 .listen(3000, '0.0.0.0', () => {
