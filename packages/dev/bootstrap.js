@@ -21,11 +21,18 @@ function infoList(cx) {
   // this.$jwt.sign('data');
   cx.service.logger.info();
   console.log(cx.model.User.list());
-  
-  if (cx.query.q) {
-    return cx.$logger.getName() + ' ' + cx.$User.list();
-  }
-  return new BadRequestException();
+
+  // cx.query
+  // cx.request.body
+  // cx.params
+  return cx.failed({
+    a: [1],
+    b: {a: 1}
+  });
+  // if (cx.query.q) {
+  //   return cx.$logger.getName() + ' ' + cx.$User.list();
+  // }
+  // return new BadRequestException();
 }
 
 app
