@@ -314,6 +314,58 @@ class Application extends Koa {
     this.middleware.push(errorMiddleware);
   }
   /**
+   * 可过滤的中间件
+   * @param {string | regexp | array<string | regexp>} condition 过滤条件
+   * @param {function} middleware 中间件
+   */
+  use(condition, middleware) {
+    const usable = cx => {
+      const url = cx.url;
+      let isUsable = true;
+      if (!middleware && utils.getArgType(condition).isFunction) {
+        middleware = condition;
+        condition = false;
+      }
+      if (middleware && utils.getArgType(middleware).isFunction) {
+        if (condition) {
+          const conditionType = utils.getArgType(condition);
+          if (conditionType.isString) {
+            isUsable = condition === url;
+          } else if (conditionType.isRegExp) {
+            isUsable = condition.test(url);
+          } else if (conditionType.isArray) {
+            isUsable = condition.some(item => {
+              const itemType = utils.getArgType(item);
+              return itemType.isString ?
+                      item === url :
+                        itemType.isRegExp ?
+                        item.test(url) :
+                        false;
+            });
+          } else {
+            isUsable = true;
+          }
+        } else {
+          isUsable = true;
+        }
+      }
+      return isUsable;
+    };
+
+    // inner middleware
+    const _middleware = async (cx, next) => {
+      const isUsable = usable(cx);
+      if (isUsable) {
+        await middleware(cx, next);
+      } else {
+        await next();
+      }
+    };
+
+    super.use(_middleware);
+    return this;
+  }
+  /**
    * @param {object} services 注册的service的key/value对象
    * @returns {object} this
    */

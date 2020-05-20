@@ -5,10 +5,11 @@ const app = new Eryue();
 app.on('error', err => {
   console.log('app.error', err);
 });
-app.use(async (cx, next) => {
+app.use(/^\/info/, async (cx, next) => {
   // if (!cx.query.token) {
   //   cx.failed(403);
   // } else {
+    console.log('access request');
     await next();
   // }
 });
