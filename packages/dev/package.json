@@ -2,9 +2,10 @@
   "name": "dev",
   "version": "1.0.0",
   "description": "",
-  "main": "babel.config.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "eryue-scripts start --mode dev",
+    "prod": "eryue-scripts start --mode prod",
+    "test-jasypt": "npm run prod -- --encryptedConfig never_write_in_here"
   },
   "keywords": [],
   "author": "",
@@ -16,6 +17,7 @@
     "babel-plugin-module-resolver": "^4.0.0"
   },
   "dependencies": {
+    "@eryue/cli": "^1.0.0",
     "@eryue/core": "^1.0.0",
     "@megvii-scripts/utils": "^1.0.0-alpha.38"
   }

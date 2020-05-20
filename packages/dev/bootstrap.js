@@ -1,9 +1,17 @@
-import Eryue, { BadRequestException } from '@eryue/core';
-import config from '@config';
+import Eryue from '@eryue/core';
 import { log } from '@megvii-scripts/utils';
 
-const app = new Eryue(config);
-
+const app = new Eryue();
+app.on('error', err => {
+  console.log('app.error', err);
+});
+app.use(async (cx, next) => {
+  // if (!cx.query.token) {
+  //   cx.failed(403);
+  // } else {
+    await next();
+  // }
+});
 // modules controler, modle, module
 class Logger {
   constructor(app) {
@@ -19,26 +27,35 @@ class Logger {
 function infoList(cx) {
   // this.$logger.info('1');
   // this.$jwt.sign('data');
-  cx.service.logger.info();
-  console.log(cx.model.User.list());
-
+  // cx.service.logger.info();
+  // console.log(cx.model.User.list());
+  // const token = cx.jwt.verify('ass');
+  // console.log(token);
   // cx.query
   // cx.request.body
   // cx.params
-  return cx.failed({
-    a: [1],
-    b: {a: 1}
-  });
+  // cx.$cookies('abc', '123', {
+  //   maxAge: 1111111
+  // });
+  // cx.throw(401, 'gg');
+  // cx.success(cx.jwt.sign({name: 'hh'}));
   // if (cx.query.q) {
   //   return cx.$logger.getName() + ' ' + cx.$User.list();
   // }
   // return new BadRequestException();
+  cx.success({
+    env: process.env.NODE_ENV,
+    configPath: process.env.ERYUE_CONFIG_PATH,
+    config: app.config
+  });
 }
 
 app
 .get({
   '/info/list': infoList,
-  '/l': cx => cx.path
+  '/l': cx => {
+    cx.success(cx.jwt.verify(cx.query.q, 'secret'));
+  }
 });
 
 // app.service.jwt.sign/verify => $jwt
@@ -61,5 +78,5 @@ app.model({
 
 app
 .listen(3000, '0.0.0.0', () => {
-  log.info(`server listening at port: 3000`);
+  log.info(`server listening at port: 3000`, process.env.NODE_ENV);
 });
