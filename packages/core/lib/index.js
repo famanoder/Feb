@@ -1,22 +1,37 @@
 import Koa from 'koa';
 import KoaRouter from 'koa-router';
-import { getArgType } from '@iuv-tools/utils';
+import { jwt } from './jwt';
+import { getArgType, log } from './util';
 import { handleRoutes } from './router';
 import { responseHelper } from './res-helper';
+import { cookiesMiddleware } from './cookies-middleware';
+import { errorMiddleware } from './error-middleware';
+import { configResolver } from './config-resolver';
 
 const router = new KoaRouter();
 
-export * from './exception';
-
 export default class Application extends Koa {
-  constructor(config) {
+  constructor() {
     super();
+
+    const config = configResolver();
+    
     this.config = config;
+    this.context.parent = this;
     this.context.config = config;
     this.context.service = Object.create(null);
     this.context.model = Object.create(null);
+
+    jwt(this);
     responseHelper(this);
+
+    this.middleware.push(cookiesMiddleware);
+    this.middleware.push(errorMiddleware);
   }
+  /**
+   * @param {object} services 注册的service的key/value对象
+   * @returns {object} this
+   */
   service(services) {
     // 数据操作
     if (getArgType(services).isObject) {
@@ -33,6 +48,7 @@ export default class Application extends Koa {
         }
       });
     }
+    return this;
   }
   model(models) {
     // 数据模型
@@ -45,6 +61,7 @@ export default class Application extends Koa {
         this.context[`$${modelName}`] = model; // alias: cx.$User
       });
     }
+    return this;
   }
   // accept user define
   defineResponseHelper(joi) {

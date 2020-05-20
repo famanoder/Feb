@@ -1,142 +1,46 @@
 'use strict';
 
-Object.defineProperty(exports, '__esModule', { value: true });
-
 function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
 
 var Koa = _interopDefault(require('koa'));
 var KoaRouter = _interopDefault(require('koa-router'));
+var jsonwebtoken = _interopDefault(require('jsonwebtoken'));
 var utils = require('@iuv-tools/utils');
 var joi = _interopDefault(require('@hapi/joi'));
+var Jasypt = _interopDefault(require('@eryue/jasypt'));
 
-const EXCEPTION = Symbol('http:exception');
-
-class Exception extends Error {
-  constructor(code, msg) {
-    super(...arguments);
-    this.name = EXCEPTION;
-    this.code = code;
-    this.message = msg;
-    this.stack = (new Error()).stack;
-  }
-}
-
-class BadRequestException extends Exception {
-  constructor(msg) {
-    super(400, msg || '[400] bad request exception');
-  }
-}
-
-class UnauthorizedException extends Exception {
-  constructor(msg) {
-    super(401, msg || '[401] unauthorized exception');
-  }
-}
-
-class ForbiddenException extends Exception {
-  constructor(msg) {
-    super(403, msg || '[403] forbidden exception');
-  }
-}
-
-class NotFoundException extends Exception {
-  constructor(msg) {
-    super(404, msg || '[404] not found exception');
-  }
-}
-
-class NotAcceptableException extends Exception {
-  constructor(msg) {
-    super(406, msg || '[406] not acceptable exception');
-  }
-}
-
-class RequestTimeoutException extends Exception {
-  constructor(msg) {
-    super(408, msg || '[408] request timeout exception');
-  }
-}
-
-class ConflictException extends Exception {
-  constructor(msg) {
-    super(409, msg || '[409] conflict exception');
-  }
-}
-
-class GoneException extends Exception {
-  constructor(msg) {
-    super(410, msg || '[410] gone exception');
-  }
-}
-
-class PayloadTooLargeException extends Exception {
-  constructor(msg) {
-    super(413, msg || '[413] payload too large exception');
-  }
-}
-
-class UnsupportedMediaTypeException extends Exception {
-  constructor(msg) {
-    super(415, msg || '[415] unsupported media type exception');
-  }
-}
-
-class UnprocessableException extends Exception {
-  constructor(msg) {
-    super(415, msg || '[415] unprocessable exception');
-  }
-}
-
-class InternalServerErrorException extends Exception {
-  constructor(msg) {
-    super(500, msg || '[500] internal server error exception');
-  }
-}
-
-class NotImplementedException extends Exception {
-  constructor(msg) {
-    super(501, msg || '[501] not implemented exception');
-  }
-}
-
-class BadGatewayException extends Exception {
-  constructor(msg) {
-    super(502, msg || '[502] bad gateway exception');
-  }
-}
-
-class ServiceUnavailableException extends Exception {
-  constructor(msg) {
-    super(503, msg || '[503] service unavailable exception');
-  }
-}
-
-class GatewayTimeoutException extends Exception {
-  constructor(msg) {
-    super(504, msg || '[504] gateway timeout exception');
-  }
+function jwt(app) {
+	const { secret = 'secret', expire = 60 * 10 } = app.config.jwt || {};
+  app.context.jwt = {
+    sign(data, opts) {
+      const token = jsonwebtoken.sign(data, secret, Object.assign({
+        expiresIn: expire
+      }, opts));
+      return token;
+    },
+    verify(token) {
+      const res = {
+        error: null,
+        token: null,
+        isExpired: false,
+        isInvalid: false
+      };
+      try {
+        res.token = jsonwebtoken.verify(token, secret);
+      } catch (e) {
+        res.error = e.name;
+        res.isExpired = e.name === 'TokenExpiredError';
+        res.isInvalid = e.name === 'JsonWebTokenError';
+      }
+      return res;
+    }
+  };
 }
 
 function handleRoutes(application, router) {
   const handleRoute = function (method, uri, handler) {
     router[method].apply(router, [uri, async (cx, next) => {
-      const res = await handler.call(router, cx);
-      if (res instanceof Exception) {
-        const  { message, code, stack } = res;
-        cx.body = message;
-        cx.status = code;
-        console.log(stack);
-        return;
-      } else if (utils.getArgType(res).isObject) {
-        // cx.success/failed
-        // {}
-        const { statusCode, body } = res;
-        cx.status = statusCode;
-        cx.body = body;
-      } else {
-        cx.status = 200;
-        cx.body = res;
-      }
+      handler.call(router, cx);
     }]);
   }
   ;['get', 'post', 'put', 'head', 'patch', 'options', 'delete', 'del', 'all'].forEach(method => {
@@ -153,6 +57,25 @@ function handleRoutes(application, router) {
   });
 }
 
+const httpException = {
+  400: 'bad request exception',
+  401: 'unauthorized exception',
+  403: 'forbidden exception',
+  404: 'not found exception',
+  406: 'not acceptable exception',
+  408: 'request timeout exception',
+  409: 'conflict exception',
+  410: 'gone exception',
+  413: 'payload too large exception',
+  415: 'unsupported media type exception',
+  422: 'unprocessable exception',
+  500: 'internal server error exception',
+  501: 'not implemented exception',
+  502: 'bad gateway exception',
+  503: 'service unavailable exception',
+  504: 'gateway timeout exception'
+};
+
 const helperSchema = joi.object({
                 schema: joi.object().required(),
                 handler: joi.function().required()
@@ -165,7 +88,7 @@ const defaultResponseHelper = {
   success: {
     schema: joi.object({
       success: joi.boolean().required(),
-      result: joi.required()
+      result: joi.any()
     }),
     handler(res) {
       const body = {
@@ -178,7 +101,7 @@ const defaultResponseHelper = {
   failed: {
     schema: joi.object({
       success: joi.boolean().required(),
-      result: joi.required()
+      result: joi.any()
     }),
     handler(res) {
       const body = {
@@ -194,7 +117,7 @@ function responseHelper(app) {
   let responseHelper = app.defineResponseHelper.call(app, joi);
 
   if (responseHelper) {
-    const { value, error } = responseHelperSchema.validate(responseHelper);
+    const { error } = responseHelperSchema.validate(responseHelper);
     if (error) {
       throw new Error(error);
     }
@@ -209,54 +132,191 @@ function responseHelper(app) {
     }
     const { handler, schema } = defaultResponseHelper.success;
     let body = handler(res);
-    const { value, error } = schema.validate(body);
+    const { error } = schema.validate(body);
     
     if (error) {
       utils.log.error(error, 'schema');
-      res = error;
+      body = error;
       code = 500;
-    } else {
-      res = body;
     }
-    return {
-      statusCode: code,
-      body: res
-    };
+    this.status = code;
+    this.body = body;
   };
 
   app.context.failed = function (code, res) {
-    if (arguments.length === 1) {
+    if (!res && !utils.getArgType(code).isNumber) {
       res = code;
       code = 500;
     }
+    if (!res) {
+      res = httpException[code] || null;
+    } 
     const { handler, schema } = defaultResponseHelper.failed;
     let body = handler(res);
-    const { value, error } = schema.validate(body);
+    const { error } = schema.validate(body);
     
     if (error) {
       utils.log.error(error, 'schema');
-      res = error;
-    } else {
-      res = body;
+      body = error;
     }
-    return {
-      statusCode: code,
-      body: res
-    };
+    this.status = code;
+    this.body = body;
   };
+}
+
+async function cookiesMiddleware(cx, next) {
+  // {
+  //   keys,
+  //   option: {
+  //   }
+  // }
+  let { cookies } = cx.app.config;
+  const cookiesArguments = joi.object({
+    0: joi.string().required(),
+    1: [
+      joi.string(),
+      joi.number(),
+      joi.boolean()
+    ],
+    2: joi.any()
+  });
+
+  if (utils.getArgType(cookies).isObject) {
+    if (!utils.getArgType(cookies.option).isObject) {
+      cookies.option = {};
+    }
+    if (utils.getArgType(cookies.keys).isArray) {
+      cx.app.keys = cookies.keys;
+      cookies.option.signed = true;
+    }
+  } else {
+    cookies = {
+      keys: ['secret'],
+      option: {
+        signed: true,
+        httpOnly: true
+      }
+    };
+    cx.app.keys = cookies.keys;
+  }
+
+  cx.$cookies = function(key, value, option) {
+    const { error } = cookiesArguments.validate(arguments);
+    if (error) {
+      throw new Error(error);
+    }
+    if (arguments.length === 3) {
+      return cx.cookies.set(key, value, Object.assign(cookies.option, option));
+    }
+    if (arguments.length === 2) {
+      return cx.cookies.set(key, value, cookies.option);
+    }
+    if (arguments.length === 1) {
+      return cx.cookies.get(key, cookies.option);
+    }
+  };
+
+  await next();
+}
+
+async function errorMiddleware(cx, next) {
+  try {
+    await next();
+  } catch (e) {
+    utils.log.error(e.stack, 'middleware');
+    cx.failed(500);
+  }
+}
+
+const cookiesSchema = joi.object({
+  keys: joi.array(),
+  option: joi.object({
+    maxAge: joi.number(),
+    signed: joi.boolean(),
+    expires: joi.date(),
+    path: joi.string(),
+    domain: joi.string(),
+    secure: joi.boolean(),
+    httpOnly: joi.boolean(),
+    overwrite: joi.boolean()
+  })
+});
+
+const jwtSchema = joi.object({
+  algorithm: joi.string(),
+  expiresIn: joi.string(),
+  notBefore: joi.string(),
+  audience: [
+    joi.string(),
+    joi.array()
+  ],
+  subject: joi.string(),
+  issuer: joi.string(),
+  jwtid: joi.string(),
+  mutatePayload: joi.boolean(),
+  noTimestamp: joi.boolean(),
+  header: joi.object(),
+  encoding: joi.string()
+});
+
+const configSchema = joi.object({
+  cookies: cookiesSchema,
+  jwt: jwtSchema,
+  name: joi.string()
+});
+
+function validateConfig(config) {
+  return configSchema.validate(config || {});
+}
+
+function configResolver() {
+  const configPath = process.env.ERYUE_CONFIG_PATH;
+
+  try {
+    const config = require(configPath);
+    const { error } = validateConfig(config);
+    if (error) {
+      utils.log.error(error, 'config');
+      process.exit(1);
+    }
+    const jasyptPass = process.env.ERYUE_JASYPT;
+    if (jasyptPass) {
+      const jasypt = new Jasypt();
+      jasypt.setPassword(jasyptPass);
+      jasypt.decryptConfig(config);
+    }
+    return config;
+  } catch (e) {
+    utils.log.error(e, 'config');
+    utils.log.error('please make sure the config file exists.', 'config');
+    process.exit(1);
+  }
 }
 
 const router = new KoaRouter();
 
 class Application extends Koa {
-  constructor(config) {
+  constructor() {
     super();
+
+    const config = configResolver();
+    
     this.config = config;
+    this.context.parent = this;
     this.context.config = config;
     this.context.service = Object.create(null);
     this.context.model = Object.create(null);
+
+    jwt(this);
     responseHelper(this);
+
+    this.middleware.push(cookiesMiddleware);
+    this.middleware.push(errorMiddleware);
   }
+  /**
+   * @param {object} services 注册的service的key/value对象
+   * @returns {object} this
+   */
   service(services) {
     // 数据操作
     if (utils.getArgType(services).isObject) {
@@ -273,6 +333,7 @@ class Application extends Koa {
         }
       });
     }
+    return this;
   }
   model(models) {
     // 数据模型
@@ -285,6 +346,7 @@ class Application extends Koa {
         this.context[`$${modelName}`] = model; // alias: cx.$User
       });
     }
+    return this;
   }
   // accept user define
   defineResponseHelper(joi) {
@@ -307,22 +369,4 @@ class Application extends Koa {
 
 handleRoutes(Application, router);
 
-exports.BadGatewayException = BadGatewayException;
-exports.BadRequestException = BadRequestException;
-exports.ConflictException = ConflictException;
-exports.EXCEPTION = EXCEPTION;
-exports.Exception = Exception;
-exports.ForbiddenException = ForbiddenException;
-exports.GatewayTimeoutException = GatewayTimeoutException;
-exports.GoneException = GoneException;
-exports.InternalServerErrorException = InternalServerErrorException;
-exports.NotAcceptableException = NotAcceptableException;
-exports.NotFoundException = NotFoundException;
-exports.NotImplementedException = NotImplementedException;
-exports.PayloadTooLargeException = PayloadTooLargeException;
-exports.RequestTimeoutException = RequestTimeoutException;
-exports.ServiceUnavailableException = ServiceUnavailableException;
-exports.UnauthorizedException = UnauthorizedException;
-exports.UnprocessableException = UnprocessableException;
-exports.UnsupportedMediaTypeException = UnsupportedMediaTypeException;
-exports.default = Application;
+module.exports = Application;

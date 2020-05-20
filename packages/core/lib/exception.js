@@ -1,4 +1,4 @@
-export const EXCEPTION = Symbol('http:exception');
+export const EXCEPTION = Symbol('http#exception');
 
 export class Exception extends Error {
   constructor(code, msg) {
@@ -9,6 +9,25 @@ export class Exception extends Error {
     this.stack = (new Error()).stack;
   }
 }
+
+export const httpException = {
+  400: 'bad request exception',
+  401: 'unauthorized exception',
+  403: 'forbidden exception',
+  404: 'not found exception',
+  406: 'not acceptable exception',
+  408: 'request timeout exception',
+  409: 'conflict exception',
+  410: 'gone exception',
+  413: 'payload too large exception',
+  415: 'unsupported media type exception',
+  422: 'unprocessable exception',
+  500: 'internal server error exception',
+  501: 'not implemented exception',
+  502: 'bad gateway exception',
+  503: 'service unavailable exception',
+  504: 'gateway timeout exception'
+} 
 
 export class BadRequestException extends Exception {
   constructor(msg) {

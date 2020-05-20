@@ -1,0 +1,20 @@
+{
+  "name": "@eryue/cli",
+  "version": "1.0.0",
+  "description": "",
+  "main": "cli.js",
+  "bin": {
+    "eryue-scripts": "./cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@hapi/joi": "^17.1.1",
+    "@iuv-tools/utils": "^1.0.0-beta.2",
+    "yargs-parser": "^18.1.3"
+  }
+}

@@ -1,5 +1,6 @@
 import joi from '@hapi/joi';
-import { getArgType, log } from '@iuv-tools/utils';
+import { httpException } from './exception';
+import { getArgType, log } from './util';
 
 const helperSchema = joi.object({
                 schema: joi.object().required(),
@@ -13,7 +14,7 @@ const defaultResponseHelper = {
   success: {
     schema: joi.object({
       success: joi.boolean().required(),
-      result: joi.required()
+      result: joi.any()
     }),
     handler(res) {
       const body = {
@@ -26,7 +27,7 @@ const defaultResponseHelper = {
   failed: {
     schema: joi.object({
       success: joi.boolean().required(),
-      result: joi.required()
+      result: joi.any()
     }),
     handler(res) {
       const body = {
@@ -42,7 +43,7 @@ export function responseHelper(app) {
   let responseHelper = app.defineResponseHelper.call(app, joi);
 
   if (responseHelper) {
-    const { value, error } = responseHelperSchema.validate(responseHelper);
+    const { error } = responseHelperSchema.validate(responseHelper);
     if (error) {
       throw new Error(error);
     }
@@ -57,40 +58,35 @@ export function responseHelper(app) {
     }
     const { handler, schema } = defaultResponseHelper.success;
     let body = handler(res);
-    const { value, error } = schema.validate(body);
+    const { error } = schema.validate(body);
     
     if (error) {
       log.error(error, 'schema');
-      res = error;
+      body = error;
       code = 500;
-    } else {
-      res = body;
     }
-    return {
-      statusCode: code,
-      body: res
-    };
+    this.status = code;
+    this.body = body;
   }
 
   app.context.failed = function (code, res) {
-    if (arguments.length === 1) {
+    if (!res && !getArgType(code).isNumber) {
       res = code;
       code = 500;
     }
+    if (!res) {
+      res = httpException[code] || null;
+    } 
     const { handler, schema } = defaultResponseHelper.failed;
     let body = handler(res);
-    const { value, error } = schema.validate(body);
+    const { error } = schema.validate(body);
     
     if (error) {
       log.error(error, 'schema');
-      res = error;
-    } else {
-      res = body;
+      body = error;
     }
-    return {
-      statusCode: code,
-      body: res
-    };
+    this.status = code;
+    this.body = body;
   }
 }
 
