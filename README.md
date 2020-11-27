@@ -3,19 +3,19 @@
 npm i @megvii-icons/vue-svg-icons --registry http://10.199.0.216:4873/
 ```
 
-// 使用
+* webpack-chain 配置
 ```js
-import Vue from 'vue';
-import SvgIcon from '@megvii-icons/vue-svg-icons';
-
-Vue.use(SvgIcon, {
-  tagName: 'meg-icon'
-});
-```
-
-// template
-```html
-<template>
-  <meg-icon name="cbg-example"></meg-icon>
-</template>
+chainWebpack(config) {
+  config.module
+    .rule('meg-icon')
+    .test(/\.js$/)
+    .use('pull-svg-icons')
+    .loader('@megvii-icons/pull-svg-icons')
+    .tap(() => {
+      return {
+        requestUri: 'https://fe-cms.mcd.megvii-inc.com/v1/feicons/svg/pullSvgIcons',
+        projects: 'cbg-icons'
+      }
+    });
+}
 ```
